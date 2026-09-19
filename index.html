@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Dithering Studio // dither-studio.slippylabs.com</title>
+<meta name="description" content="Turn any photo into a 1-bit, Game Boy, CGA or custom-palette image with real error-diffusion and ordered dithering — eleven kernels, nine palettes, and a PNG straight back out. Runs entirely in your browser, nothing is uploaded.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://dither-studio.slippylabs.com/">
+<meta property="og:title" content="Image Dithering Studio // dither-studio.slippylabs.com">
+<meta property="og:description" content="Turn any photo into a 1-bit, Game Boy, CGA or custom-palette image with real error-diffusion and ordered dithering — eleven kernels, nine palettes, and a PNG straight back out. Runs entirely in your browser, nothing is uploaded.">
+<meta property="og:image" content="https://dither-studio.slippylabs.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Image Dithering Studio // dither-studio.slippylabs.com">
+<meta name="twitter:description" content="Turn any photo into a 1-bit, Game Boy, CGA or custom-palette image with real error-diffusion and ordered dithering — eleven kernels, nine palettes, and a PNG straight back out. Runs entirely in your browser, nothing is uploaded.">
+<meta name="twitter:image" content="https://dither-studio.slippylabs.com/og-image.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2234%22%20r%3D%2222%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2216%22%20r%3D%228%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2244%22%20cy%3D%2216%22%20r%3D%228%22%20fill%3D%22%231c8a52%22%20stroke%3D%22%2339ff8f%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E">
+<meta name="theme-color" content="#050b10">
+<link rel="stylesheet" href="style.css?v=1">
+<script>/* perf-lite: drop blend/blur effects on low-power devices. ?fx=lite or ?fx=full to override (persisted). */
+(function(){try{var k="slippy-fx",m=location.search.match(/[?&]fx=(lite|full)/),v=m?m[1]:localStorage.getItem(k);if(m)localStorage.setItem(k,v);if(v==="lite"||(v!=="full"&&(navigator.hardwareConcurrency||8)<=2))document.documentElement.classList.add("perf-lite");}catch(e){}})();</script>
+</head>
+<body>
+
+<div class="starfield"></div>
+<div class="scanlines"></div>
+
+<main class="page-wrap">
+  <div class="hud-panel wide">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+
+    <div class="callsign-row">
+      <div class="toad-avatar-wrap">
+        <svg class="toad-avatar" width="46" height="46" viewBox="0 0 64 64">
+          <circle cx="32" cy="34" r="22" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="44" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="3.5" fill="#050b10"/>
+          <circle cx="44" cy="16" r="3.5" fill="#050b10"/>
+          <ellipse cx="24" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <ellipse cx="40" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <circle cx="24" cy="30" r="1.4" fill="#39ff8f"/>
+          <circle cx="40" cy="30" r="1.4" fill="#39ff8f"/>
+          <path d="M22 42 Q32 48 42 42" stroke="#050b10" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+        <div class="lock-reticle"></div>
+      </div>
+      <span class="callsign">Workshop Division // Tool</span>
+      <div class="nav-links">
+        <a href="https://projects.slippylabs.com/" class="logout-link">← Archive</a>
+      </div>
+    </div>
+
+
+    <h1>IMAGE DITHERING STUDIO</h1>
+    <p class="subtitle">Floyd&ndash;Steinberg, Atkinson, Stucki, Bayer and friends, on a palette of your choosing. The whole trick is that a pixel's rounding error is not thrown away &mdash; it is pushed onto the neighbours that have not been decided yet.</p>
+
+    <div class="tool-field-row">
+      <label class="tool-field-label" for="file-input">Image — stays in this tab, nothing is uploaded</label>
+      <input class="tool-file-input" id="file-input" type="file" accept="image/*">
+    </div>
+    <div class="tool-controls">
+      <button class="tool-btn" id="sample-btn">Load Test Image</button>
+      <button class="tool-btn ghost" id="download-btn">Download PNG</button>
+      <a id="download-link" hidden></a>
+    </div>
+    <p class="tool-note" id="file-error" role="alert"></p>
+
+    <div class="ds-controls">
+      <div class="tool-field-row">
+        <label class="tool-field-label" for="algo-select">Dithering</label>
+        <select class="tool-select" id="algo-select"></select>
+      </div>
+      <div class="tool-field-row">
+        <label class="tool-field-label" for="palette-select">Palette</label>
+        <select class="tool-select" id="palette-select"></select>
+      </div>
+      <div class="tool-field-row" id="kbox">
+        <label class="tool-field-label" for="k-slider">Adaptive colours</label>
+        <div class="tool-slider-row">
+          <input type="range" id="k-slider" min="2" max="64" value="16">
+          <span class="ds-slider-value" id="k-value">16</span>
+        </div>
+      </div>
+      <div class="tool-field-row">
+        <label class="tool-field-label" for="width-input">Output width (px)</label>
+        <input class="tool-number-input" id="width-input" type="number" min="16" max="2048" step="1" value="480">
+      </div>
+      <div class="tool-field-row">
+        <label class="tool-field-label" for="strength-slider">Strength / spread</label>
+        <div class="tool-slider-row">
+          <input type="range" id="strength-slider" min="0" max="100" value="100">
+          <span class="ds-slider-value" id="strength-value">1.00</span>
+        </div>
+      </div>
+      <div class="tool-field-row">
+        <label class="tool-field-label" for="zoom-select">View</label>
+        <select class="tool-select" id="zoom-select">
+          <option value="1">1× pixels</option>
+          <option value="2" selected>2× — see the pattern</option>
+          <option value="4">4×</option>
+          <option value="fit">Fit width</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="tool-checks">
+      <label class="tool-check"><input type="checkbox" id="serpentine-check" checked> Serpentine scan</label>
+      <label class="tool-check"><input type="checkbox" id="linear-check"> Diffuse in linear light</label>
+      <label class="tool-check"><input type="checkbox" id="gray-check"> Desaturate first</label>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="cert-section-label">Source</div>
+        <div class="canvas-frame"><canvas id="src-canvas" width="480" height="320"></canvas></div>
+      </div>
+      <div>
+        <div class="cert-section-label">Dithered</div>
+        <div class="canvas-frame"><canvas id="out-canvas" width="480" height="320"></canvas></div>
+      </div>
+    </div>
+
+    <div class="net-grid" id="stat-host"></div>
+
+    <div class="cert-section-label">Palette in use</div>
+    <div class="ds-swatches" id="swatch-host"></div>
+
+    <p class="tool-note">
+      Error diffusion walks the pixels in order and hands each one's rounding error to neighbours it
+      has not visited yet &mdash; which is why the kernel is always lopsided towards the right and
+      down, and why a serpentine scan (alternating direction every row) breaks up the diagonal
+      artefacts a straight left-to-right pass leaves behind. Ordered dithering instead adds a fixed
+      threshold pattern, so it has no memory at all: every pixel is independent, the result is
+      stable under animation, and the price is a visible weave.
+    </p>
+    <p class="tool-note">
+      Strength is the fraction of each pixel's error that gets passed on. At 1 the error is
+      conserved, which is what makes the average come out right; below 1 some is discarded and the
+      image drifts towards the nearest palette colour. Above 1 it would diverge — the loop feeds on
+      itself and the result is noise — so 1 is the ceiling.
+    </p>
+    <p class="tool-note">
+      Nearest colour is measured as plain Euclidean distance in sRGB, the same convention the classic
+      implementations use. &ldquo;Diffuse in linear light&rdquo; converts to linear, does the whole
+      thing there, and converts back &mdash; more physically correct, and usually visibly brighter in
+      the midtones, which is why it is a choice rather than the default.
+    </p>
+    <div class="comm-window">
+      <div class="comm-portrait">
+        <svg width="36" height="36" viewBox="0 0 64 64">
+          <circle cx="32" cy="34" r="22" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="44" cy="16" r="8" fill="#1c8a52" stroke="#39ff8f" stroke-width="2"/>
+          <circle cx="20" cy="16" r="3.5" fill="#050b10"/>
+          <circle cx="44" cy="16" r="3.5" fill="#050b10"/>
+          <ellipse cx="24" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <ellipse cx="40" cy="32" rx="4.5" ry="5.5" fill="#050b10"/>
+          <circle cx="24" cy="30" r="1.4" fill="#39ff8f"/>
+          <circle cx="40" cy="30" r="1.4" fill="#39ff8f"/>
+          <path d="M22 42 Q32 48 42 42" stroke="#050b10" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="comm-body">
+        <div class="comm-label"><span class="dot"></span> Incoming Transmission &mdash; Slippy</div>
+        <p>&quot;Four colours is not a limitation once the error has somewhere to go.&quot;</p>
+      </div>
+    </div>
+
+    <a href="https://projects.slippylabs.com/" class="hud-btn">← Back to Archive</a>
+  </div>
+</main>
+
+
+<script>
+/* ---- dithering core -------------------------------------------------------
+   Input and output are both RGBA byte arrays, so this half of the file never
+   touches a canvas and can be run outside a browser — which is how it gets
+   checked pixel for pixel against an independent implementation.
+
+   The working buffer is float64 per channel. That matters: the whole point of
+   error diffusion is that the error is a fraction of a level, and rounding the
+   buffer back to bytes on every pixel would throw away exactly the quantity the
+   algorithm exists to carry. */
+
+const PALETTES = [
+  { id: 'mono', name: '1-bit black & white', colors: [[0, 0, 0], [255, 255, 255]] },
+  { id: 'gray4', name: 'Grayscale — 4 levels', colors: rampGray(4) },
+  { id: 'gray8', name: 'Grayscale — 8 levels', colors: rampGray(8) },
+  { id: 'gray16', name: 'Grayscale — 16 levels', colors: rampGray(16) },
+  {
+    id: 'gameboy',
+    name: 'Game Boy DMG — 4 greens',
+    colors: [[15, 56, 15], [48, 98, 48], [139, 172, 15], [155, 188, 15]],
+  },
+  {
+    id: 'cga',
+    name: 'CGA / EGA — 16 colours',
+    colors: [
+      [0, 0, 0], [0, 0, 170], [0, 170, 0], [0, 170, 170],
+      [170, 0, 0], [170, 0, 170], [170, 85, 0], [170, 170, 170],
+      [85, 85, 85], [85, 85, 255], [85, 255, 85], [85, 255, 255],
+      [255, 85, 85], [255, 85, 255], [255, 255, 85], [255, 255, 255],
+    ],
+  },
+  {
+    id: 'c64',
+    name: 'Commodore 64 — 16 colours',
+    colors: [
+      [0, 0, 0], [255, 255, 255], [136, 57, 50], [103, 182, 189],
+      [139, 63, 150], [85, 160, 73], [64, 49, 141], [191, 206, 114],
+      [139, 84, 41], [87, 66, 0], [184, 105, 98], [80, 80, 80],
+      [120, 120, 120], [148, 224, 137], [120, 105, 196], [159, 159, 159],
+    ],
+  },
+  {
+    id: 'rgb8',
+    name: '3-bit RGB — 8 corners',
+    colors: [
+      [0, 0, 0], [255, 0, 0], [0, 255, 0], [0, 0, 255],
+      [255, 255, 0], [255, 0, 255], [0, 255, 255], [255, 255, 255],
+    ],
+  },
+  { id: 'adaptive', name: 'Adaptive — median cut', colors: null },
+];
+
+function rampGray(levels) {
+  const out = [];
+  for (let i = 0; i < levels; i++) {
+    const v = Math.round((i * 255) / (levels - 1));
+    out.push([v, v, v]);
+  }
+  return out;
+}
+
+/* Median cut: split the colour box with the longest side at the median along
+   that side, repeatedly, then average each box. Splitting at the median (not
+   the midpoint) is what makes it adapt — a box holding half the pixels gets
+   half the palette. */
+function medianCutPalette(rgba, k) {
+  const pixels = [];
+  for (let i = 0; i < rgba.length; i += 4) {
+    if (rgba[i + 3] < 8) continue;
+    pixels.push([rgba[i], rgba[i + 1], rgba[i + 2]]);
+  }
+  if (!pixels.length) return [[0, 0, 0]];
+  let boxes = [pixels];
+  while (boxes.length < k) {
+    // split the box with the widest channel spread; stop if none can be split
+    let bestIdx = -1;
+    let bestRange = -1;
+    let bestAxis = 0;
+    boxes.forEach((box, bi) => {
+      if (box.length < 2) return;
+      for (let a = 0; a < 3; a++) {
+        let lo = 255;
+        let hi = 0;
+        for (const p of box) { if (p[a] < lo) lo = p[a]; if (p[a] > hi) hi = p[a]; }
+        const range = hi - lo;
+        if (range > bestRange) { bestRange = range; bestIdx = bi; bestAxis = a; }
+      }
+    });
+    if (bestIdx < 0 || bestRange <= 0) break;
+    const box = boxes[bestIdx];
+    box.sort((p, q) => p[bestAxis] - q[bestAxis]);
+    const mid = box.length >> 1;
+    boxes.splice(bestIdx, 1, box.slice(0, mid), box.slice(mid));
+  }
+  return boxes.filter((b) => b.length).map((box) => {
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (const p of box) { r += p[0]; g += p[1]; b += p[2]; }
+    return [Math.round(r / box.length), Math.round(g / box.length), Math.round(b / box.length)];
+  });
+}
+
+/* sRGB transfer function, the real piecewise one rather than a plain 2.2 power. */
+function srgbToLinear(c) {
+  const v = c / 255;
+  return (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)) * 255;
+}
+function linearToSrgb(c) {
+  const v = Math.min(1, Math.max(0, c / 255));
+  return (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055) * 255;
+}
+
+/* Error-diffusion kernels, as [dx, dy, weight] over a shared divisor. Every one
+   of these is the published form; the weights are what distinguishes them. */
+const KERNELS = {
+  floyd: { name: 'Floyd–Steinberg', div: 16, taps: [[1, 0, 7], [-1, 1, 3], [0, 1, 5], [1, 1, 1]] },
+  falsefloyd: { name: 'False Floyd–Steinberg', div: 8, taps: [[1, 0, 3], [0, 1, 3], [1, 1, 2]] },
+  jarvis: {
+    name: 'Jarvis–Judice–Ninke', div: 48,
+    taps: [[1, 0, 7], [2, 0, 5], [-2, 1, 3], [-1, 1, 5], [0, 1, 7], [1, 1, 5], [2, 1, 3],
+           [-2, 2, 1], [-1, 2, 3], [0, 2, 5], [1, 2, 3], [2, 2, 1]],
+  },
+  stucki: {
+    name: 'Stucki', div: 42,
+    taps: [[1, 0, 8], [2, 0, 4], [-2, 1, 2], [-1, 1, 4], [0, 1, 8], [1, 1, 4], [2, 1, 2],
+           [-2, 2, 1], [-1, 2, 2], [0, 2, 4], [1, 2, 2], [2, 2, 1]],
+  },
+  burkes: {
+    name: 'Burkes', div: 32,
+    taps: [[1, 0, 8], [2, 0, 4], [-2, 1, 2], [-1, 1, 4], [0, 1, 8], [1, 1, 4], [2, 1, 2]],
+  },
+  sierra3: {
+    name: 'Sierra (3 row)', div: 32,
+    taps: [[1, 0, 5], [2, 0, 3], [-2, 1, 2], [-1, 1, 4], [0, 1, 5], [1, 1, 4], [2, 1, 2],
+           [-1, 2, 2], [0, 2, 3], [1, 2, 2]],
+  },
+  sierra2: {
+    name: 'Sierra (2 row)', div: 16,
+    taps: [[1, 0, 4], [2, 0, 3], [-2, 1, 1], [-1, 1, 2], [0, 1, 3], [1, 1, 2], [2, 1, 1]],
+  },
+  sierralite: { name: 'Sierra Lite', div: 4, taps: [[1, 0, 2], [-1, 1, 1], [0, 1, 1]] },
+  /* Atkinson deliberately throws away a quarter of the error — that is why it
+     looks airier and loses contrast in flat areas. It is not a bug. */
+  atkinson: {
+    name: 'Atkinson', div: 8,
+    taps: [[1, 0, 1], [2, 0, 1], [-1, 1, 1], [0, 1, 1], [1, 1, 1], [0, 2, 1]],
+  },
+};
+
+/* Recursive Bayer matrix: each step scales the previous one by 4 and adds the
+   fixed offsets, which is what keeps the thresholds evenly distributed. */
+function bayerMatrix(n) {
+  let m = [[0]];
+  let size = 1;
+  while (size < n) {
+    const next = [];
+    for (let y = 0; y < size * 2; y++) next.push(new Array(size * 2).fill(0));
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const v = m[y][x] * 4;
+        next[y][x] = v;
+        next[y][x + size] = v + 2;
+        next[y + size][x] = v + 3;
+        next[y + size][x + size] = v + 1;
+      }
+    }
+    m = next;
+    size *= 2;
+  }
+  return m;
+}
+
+const ORDERED = {
+  bayer2: { name: 'Ordered — Bayer 2×2', matrix: bayerMatrix(2) },
+  bayer4: { name: 'Ordered — Bayer 4×4', matrix: bayerMatrix(4) },
+  bayer8: { name: 'Ordered — Bayer 8×8', matrix: bayerMatrix(8) },
+};
+
+const ALGOS = [
+  ['floyd', 'Floyd–Steinberg'],
+  ['atkinson', 'Atkinson'],
+  ['jarvis', 'Jarvis–Judice–Ninke'],
+  ['stucki', 'Stucki'],
+  ['burkes', 'Burkes'],
+  ['sierra3', 'Sierra (3 row)'],
+  ['sierra2', 'Sierra (2 row)'],
+  ['sierralite', 'Sierra Lite'],
+  ['falsefloyd', 'False Floyd–Steinberg'],
+  ['bayer2', 'Ordered — Bayer 2×2'],
+  ['bayer4', 'Ordered — Bayer 4×4'],
+  ['bayer8', 'Ordered — Bayer 8×8'],
+  ['none', 'None — nearest colour only'],
+];
+
+function nearestColor(palette, r, g, b) {
+  let best = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < palette.length; i++) {
+    const p = palette[i];
+    const dr = r - p[0];
+    const dg = g - p[1];
+    const db = b - p[2];
+    const d = dr * dr + dg * dg + db * db;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+/* opts: { algo, palette, serpentine, strength, linear, desaturate } */
+function ditherImage(rgba, w, h, opts) {
+  const palette = opts.palette;
+  const linear = !!opts.linear;
+  /* Strength above 1 amplifies each pixel's error before handing it on, which
+     turns error diffusion into a divergent feedback loop — the working buffer
+     runs away to 1e12 within a few rows and the output becomes noise. One is
+     therefore a ceiling, not a suggestion. */
+  const strength = Math.min(1, Math.max(0, opts.strength ?? 1));
+  const pal = linear ? palette.map((c) => c.map(srgbToLinear)) : palette;
+
+  // working buffer, one float64 per channel
+  const buf = new Float64Array(w * h * 3);
+  for (let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
+    let r = rgba[i];
+    let g = rgba[i + 1];
+    let b = rgba[i + 2];
+    if (opts.desaturate) {
+      // Rec. 601 luma, the convention these palettes were designed against
+      const y = 0.299 * r + 0.587 * g + 0.114 * b;
+      r = y; g = y; b = y;
+    }
+    buf[j] = linear ? srgbToLinear(r) : r;
+    buf[j + 1] = linear ? srgbToLinear(g) : g;
+    buf[j + 2] = linear ? srgbToLinear(b) : b;
+  }
+
+  const out = new Uint8ClampedArray(rgba.length);
+  const used = new Set();
+
+  if (ORDERED[opts.algo] || opts.algo === 'none') {
+    const matrix = ORDERED[opts.algo] ? ORDERED[opts.algo].matrix : null;
+    const n = matrix ? matrix.length : 1;
+    const levels = matrix ? n * n : 1;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const j = (y * w + x) * 3;
+        let offset = 0;
+        if (matrix) {
+          // centre the threshold on zero, then scale: 64/255 of a full range at
+          // strength 1, which is the usual "spread" for an 8-bit image
+          offset = ((matrix[y % n][x % n] + 0.5) / levels - 0.5) * 64 * strength;
+        }
+        const idx = nearestColor(pal, buf[j] + offset, buf[j + 1] + offset, buf[j + 2] + offset);
+        used.add(idx);
+        const o = (y * w + x) * 4;
+        out[o] = palette[idx][0];
+        out[o + 1] = palette[idx][1];
+        out[o + 2] = palette[idx][2];
+        out[o + 3] = rgba[o + 3];
+      }
+    }
+    return { out, palette, colorsUsed: used.size };
+  }
+
+  const k = KERNELS[opts.algo] || KERNELS.floyd;
+  const serp = !!opts.serpentine;
+  for (let y = 0; y < h; y++) {
+    const rightward = !serp || y % 2 === 0;
+    for (let step = 0; step < w; step++) {
+      const x = rightward ? step : w - 1 - step;
+      const j = (y * w + x) * 3;
+      const r = buf[j];
+      const g = buf[j + 1];
+      const b = buf[j + 2];
+      const idx = nearestColor(pal, r, g, b);
+      used.add(idx);
+      const o = (y * w + x) * 4;
+      out[o] = palette[idx][0];
+      out[o + 1] = palette[idx][1];
+      out[o + 2] = palette[idx][2];
+      out[o + 3] = rgba[o + 3];
+      const er = (r - pal[idx][0]) * strength;
+      const eg = (g - pal[idx][1]) * strength;
+      const eb = (b - pal[idx][2]) * strength;
+      for (const [dx, dy, wt] of k.taps) {
+        const nx = x + (rightward ? dx : -dx);
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const nj = (ny * w + nx) * 3;
+        const f = wt / k.div;
+        buf[nj] += er * f;
+        buf[nj + 1] += eg * f;
+        buf[nj + 2] += eb * f;
+      }
+    }
+  }
+  return { out, palette, colorsUsed: used.size };
+}
+
+/* Mean absolute error per channel between two RGBA buffers, in 0-255 units:
+   a single number for "how far from the original did we land". */
+function meanError(a, b) {
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    sum += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]);
+    n += 3;
+  }
+  return n ? sum / n : 0;
+}
+
+/* ==== UI ==== */
+
+const $ = (id) => document.getElementById(id);
+
+const srcCanvas = $('src-canvas');
+const outCanvas = $('out-canvas');
+const srcCtx = srcCanvas.getContext('2d', { willReadFrequently: true });
+const outCtx = outCanvas.getContext('2d');
+
+let sourceImage = null;      // an ImageBitmap or HTMLImageElement
+let srcData = null;          // ImageData at the working size
+let lastResult = null;
+
+$('algo-select').innerHTML = ALGOS.map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+$('palette-select').innerHTML = PALETTES.map((p) => `<option value="${p.id}">${p.name}</option>`).join('');
+
+function currentPalette() {
+  const id = $('palette-select').value;
+  const entry = PALETTES.find((p) => p.id === id);
+  if (entry.colors) return entry.colors;
+  const k = Number($('k-slider').value);
+  return medianCutPalette(srcData.data, k);
+}
+
+function drawSource() {
+  if (!sourceImage) return;
+  const targetW = Math.max(16, Math.min(2048, Number($('width-input').value) || 480));
+  const scale = targetW / sourceImage.width;
+  const targetH = Math.max(1, Math.round(sourceImage.height * scale));
+  srcCanvas.width = targetW;
+  srcCanvas.height = targetH;
+  outCanvas.width = targetW;
+  outCanvas.height = targetH;
+  srcCtx.imageSmoothingEnabled = true;
+  srcCtx.imageSmoothingQuality = 'high';
+  srcCtx.clearRect(0, 0, targetW, targetH);
+  srcCtx.drawImage(sourceImage, 0, 0, targetW, targetH);
+  srcData = srcCtx.getImageData(0, 0, targetW, targetH);
+  applyZoom();
+}
+
+function applyZoom() {
+  const mode = $('zoom-select').value;
+  [srcCanvas, outCanvas].forEach((c) => {
+    if (mode === 'fit') {
+      c.style.width = '100%';
+      c.style.height = 'auto';
+    } else {
+      const z = Number(mode);
+      c.style.width = `${c.width * z}px`;
+      c.style.height = `${c.height * z}px`;
+    }
+    c.style.imageRendering = 'pixelated';
+  });
+}
+
+function render() {
+  if (!srcData) return;
+  const palette = currentPalette();
+  const t0 = performance.now();
+  const res = ditherImage(srcData.data, srcData.width, srcData.height, {
+    algo: $('algo-select').value,
+    palette,
+    serpentine: $('serpentine-check').checked,
+    strength: Number($('strength-slider').value) / 100,
+    linear: $('linear-check').checked,
+    desaturate: $('gray-check').checked,
+  });
+  const ms = performance.now() - t0;
+  lastResult = res;
+  const img = new ImageData(new Uint8ClampedArray(res.out), srcData.width, srcData.height);
+  outCtx.putImageData(img, 0, 0);
+
+  const err = meanError(srcData.data, res.out);
+  const tiles = [
+    ['Size', `${srcData.width} × ${srcData.height}`],
+    ['Palette', `${palette.length} colour${palette.length === 1 ? '' : 's'}`],
+    ['Colours used', String(res.colorsUsed)],
+    ['Mean error / channel', err.toFixed(2)],
+    ['Bits per pixel', `${Math.ceil(Math.log2(Math.max(2, palette.length)))}`],
+    ['Render', `${ms.toFixed(0)} ms`],
+  ];
+  $('stat-host').innerHTML = tiles.map(([label, value]) => `
+    <div class="net-tile">
+      <div class="net-tile-label">${label}</div>
+      <div class="net-tile-value mono">${value}</div>
+    </div>`).join('');
+
+  $('swatch-host').innerHTML = palette.map((c) => {
+    const hex = `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    return `<span class="ds-swatch" style="background:${hex}" title="${hex}"></span>`;
+  }).join('');
+  applyZoom();
+}
+
+/* ---- a test image with no external asset: gradients, flat patches, a soft
+   gradient ramp and hard edges, which between them show every artefact a
+   dithering kernel can produce. ---- */
+function makeTestImage() {
+  const w = 640;
+  const h = 400;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d');
+  const sky = g.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, '#0b1d3a');
+  sky.addColorStop(0.45, '#7a4bb5');
+  sky.addColorStop(0.62, '#ff7a3d');
+  sky.addColorStop(1, '#ffd98a');
+  g.fillStyle = sky;
+  g.fillRect(0, 0, w, h);
+  // sun
+  const sun = g.createRadialGradient(w * 0.7, h * 0.42, 4, w * 0.7, h * 0.42, 70);
+  sun.addColorStop(0, '#fffbe8');
+  sun.addColorStop(1, 'rgba(255,240,180,0)');
+  g.fillStyle = sun;
+  g.fillRect(w * 0.7 - 80, h * 0.42 - 80, 160, 160);
+  // hills, flat colour so banding shows up against the gradient
+  g.fillStyle = '#123a2c';
+  g.beginPath();
+  g.moveTo(0, h * 0.78);
+  g.bezierCurveTo(w * 0.25, h * 0.66, w * 0.45, h * 0.84, w, h * 0.72);
+  g.lineTo(w, h);
+  g.lineTo(0, h);
+  g.closePath();
+  g.fill();
+  g.fillStyle = '#0a241c';
+  g.beginPath();
+  g.moveTo(0, h * 0.88);
+  g.bezierCurveTo(w * 0.35, h * 0.79, w * 0.6, h * 0.95, w, h * 0.86);
+  g.lineTo(w, h);
+  g.lineTo(0, h);
+  g.closePath();
+  g.fill();
+  // a grey ramp strip: the classic test for banding and contrast loss
+  for (let x = 0; x < w; x++) {
+    const v = Math.round((x / (w - 1)) * 255);
+    g.fillStyle = `rgb(${v},${v},${v})`;
+    g.fillRect(x, h - 34, 1, 22);
+  }
+  // hard-edged colour chips
+  ['#ff4655', '#39ff8f', '#6fb4ff', '#ffe066', '#ffffff'].forEach((col, i) => {
+    g.fillStyle = col;
+    g.fillRect(14 + i * 34, 16, 26, 26);
+  });
+  return c;
+}
+
+function loadSample() {
+  const c = makeTestImage();
+  sourceImage = c;
+  $('file-error').style.display = 'none';
+  drawSource();
+  render();
+}
+
+$('sample-btn').addEventListener('click', loadSample);
+
+$('file-input').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const err = $('file-error');
+  try {
+    const bmp = await createImageBitmap(file);
+    sourceImage = bmp;
+    err.style.display = 'none';
+    // Default to the image's own width, capped so a 6000px photo is not dithered
+    // at full size by accident.
+    $('width-input').value = String(Math.min(720, bmp.width));
+    drawSource();
+    render();
+  } catch (ex) {
+    err.textContent = 'That file could not be decoded as an image.';
+    err.style.display = 'block';
+  }
+});
+
+['algo-select', 'palette-select', 'zoom-select'].forEach((id) =>
+  $(id).addEventListener('change', () => {
+    $('kbox').style.visibility = $('palette-select').value === 'adaptive' ? 'visible' : 'hidden';
+    render();
+  }));
+['serpentine-check', 'linear-check', 'gray-check'].forEach((id) =>
+  $(id).addEventListener('change', render));
+$('k-slider').addEventListener('input', () => {
+  $('k-value').textContent = $('k-slider').value;
+  if ($('palette-select').value === 'adaptive') render();
+});
+$('strength-slider').addEventListener('input', () => {
+  $('strength-value').textContent = (Number($('strength-slider').value) / 100).toFixed(2);
+  render();
+});
+let widthTimer = null;
+$('width-input').addEventListener('input', () => {
+  clearTimeout(widthTimer);
+  widthTimer = setTimeout(() => { drawSource(); render(); }, 220);
+});
+
+$('download-btn').addEventListener('click', () => {
+  if (!lastResult) return;
+  outCanvas.toBlob((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = $('download-link');
+    a.href = url;
+    a.download = `dithered-${$('algo-select').value}-${$('palette-select').value}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }, 'image/png');
+});
+
+/* Headless hook: run the pipeline on a known buffer and read the result back,
+   without a file picker. */
+window.__dither = {
+  ditherImage,
+  medianCutPalette,
+  PALETTES,
+  KERNELS,
+  ORDERED,
+  render,
+  setOptions(opts) {
+    if (opts.algo) $('algo-select').value = opts.algo;
+    if (opts.palette) $('palette-select').value = opts.palette;
+    if (opts.width) $('width-input').value = String(opts.width);
+    if (opts.serpentine !== undefined) $('serpentine-check').checked = !!opts.serpentine;
+    if (opts.linear !== undefined) $('linear-check').checked = !!opts.linear;
+    if (opts.desaturate !== undefined) $('gray-check').checked = !!opts.desaturate;
+    if (opts.strength !== undefined) $('strength-slider').value = String(Math.round(opts.strength * 100));
+    if (opts.width) drawSource();
+    render();
+  },
+  output() {
+    return Array.from(outCtx.getImageData(0, 0, outCanvas.width, outCanvas.height).data);
+  },
+  source() {
+    return { w: srcData.width, h: srcData.height, data: Array.from(srcData.data) };
+  },
+};
+
+/* ---- boot ---- */
+$('kbox').style.visibility = 'hidden';
+loadSample();
+</script>
+<!-- Slippy Deck: floating Slippy TV + jukebox player. Renders nothing unless admin.slippylabs.com/whoami confirms a signed-in account. -->
+<script defer src="https://slippylabs.com/deck/deck.js"></script>
+<!-- Slippy Labs sitewide privacy link. Self-contained on purpose: these sites
+     share no CSS, so it carries its own styles and inherits the page's text
+     colour instead of assuming a palette. position/z-index are load bearing --
+     the HUD theme's .starfield/.scanlines are fixed at z-index 0-1 and would
+     paint straight over an unpositioned footer.
+     The .page-wrap trim below is what keeps the bar on the first screen. -->
+<div class="sl-legal"><a href="https://slippylabs.com/privacy.html">Privacy</a></div>
+<style>
+.sl-legal{box-sizing:border-box;position:relative;z-index:3;height:64px;display:flex;align-items:center;justify-content:center;margin:0;padding:0 12px;font-family:"Consolas","SFMono-Regular",Menlo,Monaco,"Courier New",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.5}
+.sl-legal a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 14px}
+.sl-legal a:hover,.sl-legal a:focus-visible{text-decoration:underline;opacity:1}
+/* This page centres .page-wrap at min-height:100vh, which would push the bar a
+   whole screen below the fold. Give back exactly the bar height instead of
+   adding a scrollbar to a page that had none. */
+.page-wrap{min-height:calc(100vh - 64px)}
+</style>
+</body>
+</html>
